@@ -1,4 +1,7 @@
+import 'package:event_countdown/controllers/auth/account_page_controller.dart';
+import 'package:event_countdown/controllers/events/events_page_controller.dart';
 import 'package:event_countdown/controllers/notifications/notifications_controller.dart';
+import 'package:event_countdown/controllers/shell_controller.dart';
 import 'package:event_countdown/data/constants.dart';
 import 'package:event_countdown/pages/account_page.dart';
 import 'package:event_countdown/pages/events_page.dart';
@@ -12,7 +15,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(url: Constants.supabaseUrl, anonKey: Constants.supabaseAnonKey);
   tz.initializeTimeZones();
+  Get.put(AuthenticationController(), permanent: true);
   Get.put(NotificationsController(), permanent: true);
+  Get.put(ShellController(), permanent: true);
   runApp(const MyApp());
 }
 
@@ -21,13 +26,38 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authController = Get.put(AuthenticationController(), permanent: true);
     final colorScheme = ColorScheme.fromSeed(
       seedColor: Colors.blueAccent,
       brightness: Brightness.dark,
     );
     return GetMaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Events Countdown',
+      initialRoute: "/account",
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case "/account":
+            return GetPageRoute(
+              title: "Account",
+              bindings: [BindingsBuilder.put(() => AccountPageController())],
+              page: () => const AccountPage(),
+              transition: Transition.native,
+              transitionDuration: const Duration(milliseconds: 420),
+              curve: Curves.fastEaseInToSlowEaseOut,
+            );
+          case "/events":
+            return GetPageRoute(
+              title: "Events",
+              bindings: [BindingsBuilder.put(() => EventsPageController())],
+              page: () => const EventsPage(),
+              transition: Transition.native,
+              transitionDuration: const Duration(milliseconds: 420),
+              curve: Curves.fastEaseInToSlowEaseOut,
+            );
+          default:
+            return null;
+        }
+      },
       theme: ThemeData(
         colorScheme: colorScheme,
         useMaterial3: true,
@@ -57,9 +87,6 @@ class MyApp extends StatelessWidget {
           fillColor: colorScheme.inversePrimary.withAlpha(60),
         ),
       ),
-      home: Obx(() {
-        return authController.currentUser.value == null ? const AccountPage() : const EventsPage();
-      }),
     );
   }
 }

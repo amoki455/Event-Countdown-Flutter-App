@@ -10,7 +10,6 @@ class EventsPage extends StatelessWidget {
     final authController = Get.find<AuthenticationController>();
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(
           "Events",
           style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -26,7 +25,10 @@ class EventsPage extends StatelessWidget {
                 ),
                 PopupMenuItem(
                   child: const Text("Logout"),
-                  onTap: () => authController.signOut(),
+                  onTap: () {
+                    authController.signOut();
+                    Get.offNamed("/account");
+                  },
                 ),
               ];
             },
