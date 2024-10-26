@@ -1,3 +1,4 @@
+import 'package:event_countdown/controllers/notifications/notifications_controller.dart';
 import 'package:event_countdown/data/constants.dart';
 import 'package:event_countdown/pages/account_page.dart';
 import 'package:event_countdown/pages/events_page.dart';
@@ -5,10 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'controllers/auth/authentication_controller.dart';
+import 'package:timezone/data/latest.dart' as tz;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(url: Constants.supabaseUrl, anonKey: Constants.supabaseAnonKey);
+  tz.initializeTimeZones();
+  Get.put(NotificationsController(), permanent: true);
   runApp(const MyApp());
 }
 
