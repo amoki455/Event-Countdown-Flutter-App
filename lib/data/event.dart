@@ -1,4 +1,6 @@
-class Event {
+import 'package:event_countdown/components/adaptive_list.dart';
+
+class Event implements AdaptiveListItem {
   final String id;
   final String userId;
   final String title;
@@ -13,6 +15,9 @@ class Event {
       return null;
     }
   }
+
+  @override
+  Object get itemId => id;
 
 //<editor-fold desc="Data Methods">
   const Event({

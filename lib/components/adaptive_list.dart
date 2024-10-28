@@ -1,42 +1,43 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
-class AdaptiveList extends StatefulWidget {
+const kItemAnimationDuration = Duration(milliseconds: 450);
+
+class AdaptiveList<T extends AdaptiveListItem> extends StatefulWidget {
   const AdaptiveList({
     super.key,
     required this.gridItemWidth,
     required this.gridItemHeight,
-    required this.itemCount,
+    required this.items,
     required this.itemBuilder,
-    required this.itemKey,
     this.listPadding,
     this.gridTopPadding = 0,
     this.gridBottomPadding = 0,
-    required this.removeExecutor,
   });
 
   final double gridItemWidth;
   final double gridItemHeight;
-  final int itemCount;
-  final NullableIndexedWidgetBuilder itemBuilder;
-  final Object Function(int index) itemKey;
+  final List<T> items;
+  final Widget? Function(BuildContext context, dynamic item) itemBuilder;
   final EdgeInsetsGeometry? listPadding;
   final double gridTopPadding;
   final double gridBottomPadding;
-  final ListItemRemoveExecutor removeExecutor;
 
   @override
   State<AdaptiveList> createState() => _AdaptiveListState();
 }
 
 class _AdaptiveListState extends State<AdaptiveList> {
-  final Map<Object, int> _items = {};
+  final List<AdaptiveListItem> _currentItems = [];
+  final List<AdaptiveListItem> _oldItems = [];
+  final List<AdaptiveListItem> _currentlyVisibleItems = [];
+  final Map<Object, int> _itemsIndices = {};
   final Map<Object, _ItemRemovalCallback> _itemsRemovalCallbacks = {};
 
   @override
   void initState() {
     super.initState();
-    widget.removeExecutor.run = _executeItemRemoval;
+    _currentItems.addAll(widget.items);
   }
 
   @override
@@ -60,14 +61,23 @@ class _AdaptiveListState extends State<AdaptiveList> {
       child: ListView.builder(
         padding: widget.listPadding ?? const EdgeInsets.all(4),
         shrinkWrap: true,
-        itemCount: widget.itemCount,
+        itemCount: _currentItems.length,
         itemBuilder: (context, index) {
+          final item = _currentItems[index];
+          final oldIndex = _getOldIndex(item.itemId, index);
           return _AnimatedItem(
-            key: ObjectKey(widget.itemKey(index)),
+            key: ObjectKey(item.itemId),
             index: index,
-            oldIndex: _getOldIndex(widget.itemKey(index), index),
-            itemRemovalCallback: _getItemRemovalCallback(widget.itemKey(index)),
-            child: widget.itemBuilder(context, index) ?? const SizedBox(),
+            oldIndex: oldIndex,
+            isInserted: oldIndex == -1 && index < _oldItems.length,
+            itemRemovalCallback: _getItemRemovalCallback(item.itemId),
+            child: widget.itemBuilder(context, item) ?? const SizedBox(),
+            onInit: () {
+              _currentlyVisibleItems.add(item);
+            },
+            onDispose: () {
+              _currentlyVisibleItems.remove(item);
+            },
           );
         },
       ),
@@ -98,44 +108,119 @@ class _AdaptiveListState extends State<AdaptiveList> {
           mainAxisSpacing: verticalSpacing,
           childAspectRatio: widget.gridItemWidth / widget.gridItemHeight,
         ),
-        itemCount: widget.itemCount,
+        itemCount: _currentItems.length,
         itemBuilder: (context, index) {
+          final item = _currentItems[index];
+          final oldIndex = _getOldIndex(item.itemId, index);
           return _AnimatedItem(
-            key: ObjectKey(widget.itemKey(index)),
+            key: ObjectKey(item.itemId),
             index: index,
-            oldIndex: _getOldIndex(widget.itemKey(index), index),
-            itemRemovalCallback: _getItemRemovalCallback(widget.itemKey(index)),
+            oldIndex: oldIndex,
+            itemRemovalCallback: _getItemRemovalCallback(item.itemId),
             isInGrid: true,
+            isInserted: oldIndex == -1 && index < _oldItems.length,
             gridColumnCount: columnCount,
             singleGridItemXOffset: widget.gridItemWidth + itemHorizontalSpacing,
             singleGridItemYOffset: widget.gridItemHeight + verticalSpacing,
-            child: widget.itemBuilder(context, index) ?? const SizedBox(),
+            child: widget.itemBuilder(context, item) ?? const SizedBox(),
+            onInit: () {
+              _currentlyVisibleItems.add(item);
+            },
+            onDispose: () {
+              _currentlyVisibleItems.remove(item);
+            },
           );
         },
       ),
     );
   }
 
-  int _getOldIndex(Object itemKey, int newIndex) {
-    final old = _items[itemKey] ?? -1;
-    _items[itemKey] = newIndex;
-    return old;
+  int _getOldIndex(Object itemId, int newIndex) {
+    final old = _itemsIndices[itemId] ?? -1;
+    _itemsIndices[itemId] = newIndex;
+    if (old == -2) {
+      // will be -2 if there was a recalculation and this item was not visible.
+      // return newIndex to avoid replaying 'enter' or 'reordering' animation.
+      return newIndex;
+    } else {
+      return old;
+    }
   }
 
-  _ItemRemovalCallback _getItemRemovalCallback(Object itemKey) {
-    final old = _itemsRemovalCallbacks[itemKey];
+  _ItemRemovalCallback _getItemRemovalCallback(Object itemId) {
+    final old = _itemsRemovalCallbacks[itemId];
     if (old != null) return old;
     final newValue = _ItemRemovalCallback();
-    _itemsRemovalCallbacks[itemKey] = newValue;
+    _itemsRemovalCallbacks[itemId] = newValue;
     return newValue;
   }
 
-  void _executeItemRemoval(Object itemKey, VoidCallback fn) {
-    final callback = _itemsRemovalCallbacks[itemKey];
-    if (callback != null && callback.run != null) {
-      callback.run!().then((_) => fn());
+  void _updateLists() {
+    _oldItems.clear();
+    _oldItems.addAll(_currentItems);
+    _currentItems.clear();
+    _currentItems.addAll(widget.items);
+  }
+
+  void _recalculateIndices() {
+    for (final k in _itemsIndices.keys) {
+      bool found = false;
+      for (final e in _currentlyVisibleItems) {
+        if (e.itemId == k) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        _itemsIndices[k] = -2;
+      }
     }
-    // _itemsRemovalCallbacks.remove(itemKey);
+  }
+
+  bool _checkRemovedItems() {
+    final itemsRemoveCallbacks = <Object, _ItemRemovalCallback>{};
+    for (int i = 0; i < _currentItems.length; i++) {
+      final item = _currentItems[i];
+      final newIndex = widget.items.indexOf(item);
+      if (newIndex == -1) {
+        // item is removed
+        final callback = _itemsRemovalCallbacks[item.itemId];
+        if (callback != null) {
+          itemsRemoveCallbacks[item.itemId] = callback;
+        }
+      }
+    }
+
+    if (itemsRemoveCallbacks.isNotEmpty) {
+      for (final itemId in itemsRemoveCallbacks.keys) {
+        final callback = itemsRemoveCallbacks[itemId];
+        if (callback != null && callback.run != null) {
+          _recalculateIndices();
+          callback.run!().then((_) {
+            _itemsRemovalCallbacks.removeWhere((key, value) => value == callback);
+          });
+        }
+      }
+      Future.delayed(kItemAnimationDuration, () {
+        if (mounted) {
+          setState(() => _updateLists());
+        }
+      });
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AdaptiveList oldWidget) {
+    if (!_checkRemovedItems()) {
+      if (_currentItems.length < widget.items.length) {
+        _recalculateIndices();
+      }
+      _updateLists();
+    }
+    super.didUpdateWidget(oldWidget);
   }
 
   @override
@@ -153,11 +238,15 @@ class _AnimatedItem extends StatefulWidget {
     this.singleGridItemXOffset = 0,
     this.singleGridItemYOffset = 0,
     this.isInGrid = false,
+    this.isInserted = false,
     this.gridColumnCount = 0,
     required this.itemRemovalCallback,
+    this.onInit,
+    this.onDispose,
   });
 
   final bool isInGrid;
+  final bool isInserted;
   final int gridColumnCount;
   final Widget child;
   final int index;
@@ -165,6 +254,8 @@ class _AnimatedItem extends StatefulWidget {
   final double singleGridItemXOffset;
   final double singleGridItemYOffset;
   final _ItemRemovalCallback itemRemovalCallback;
+  final void Function()? onInit;
+  final void Function()? onDispose;
 
   @override
   State<_AnimatedItem> createState() => _AnimatedItemState();
@@ -174,13 +265,17 @@ class _AnimatedItemState extends State<_AnimatedItem> with SingleTickerProviderS
   late final AnimationController _animationCtrl;
   late final CurvedAnimation _curvedAnimation;
   Animation<Offset>? _gridItemOffsetAnimation;
+  bool _removed = false;
 
   @override
   void initState() {
     super.initState();
+    if (widget.onInit != null) {
+      widget.onInit!();
+    }
     _animationCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 450),
+      duration: kItemAnimationDuration,
     )
       ..addListener(_animationListener)
       ..addStatusListener(
@@ -198,7 +293,10 @@ class _AnimatedItemState extends State<_AnimatedItem> with SingleTickerProviderS
 
     widget.itemRemovalCallback.run = () async {
       if (mounted) {
-        await _animationCtrl.reverse();
+        _animationCtrl.reverse().whenCompleteOrCancel(() {
+          _removed = true;
+          widget.itemRemovalCallback.run = null;
+        });
       }
     };
 
@@ -211,7 +309,15 @@ class _AnimatedItemState extends State<_AnimatedItem> with SingleTickerProviderS
         }
       });
     } else if (widget.oldIndex == -1) {
-      _animationCtrl.forward(from: 0);
+      if (widget.isInGrid && widget.isInserted) {
+        Future.delayed(kItemAnimationDuration * 0.5, () {
+          if (mounted) {
+            _animationCtrl.forward(from: 0);
+          }
+        });
+      } else {
+        _animationCtrl.forward(from: 0);
+      }
     }
   }
 
@@ -226,7 +332,7 @@ class _AnimatedItemState extends State<_AnimatedItem> with SingleTickerProviderS
         return _buildDisappearingView();
       case AnimationStatus.dismissed:
         _animationCtrl.value = 1;
-        return _buildAppearingView();
+        return _removed || (widget.isInGrid && widget.isInserted) ? const SizedBox() : _buildAppearingView();
       case AnimationStatus.forward:
       case AnimationStatus.completed:
         return _buildAppearingView();
@@ -236,11 +342,16 @@ class _AnimatedItemState extends State<_AnimatedItem> with SingleTickerProviderS
   Widget _buildAppearingView() {
     return Opacity(
       opacity: _curvedAnimation.value,
-      child: Transform.scale(
-        alignment: Alignment.topCenter,
-        scale: lerpDouble(0.7, 1, _curvedAnimation.value),
-        child: widget.child,
-      ),
+      child: (!widget.isInGrid && widget.isInserted)
+          ? SizeTransition(
+              sizeFactor: _curvedAnimation,
+              child: widget.child,
+            )
+          : Transform.scale(
+              alignment: Alignment.topCenter,
+              scale: lerpDouble(0.7, 1, _curvedAnimation.value),
+              child: widget.child,
+            ),
     );
   }
 
@@ -296,6 +407,9 @@ class _AnimatedItemState extends State<_AnimatedItem> with SingleTickerProviderS
   @override
   void dispose() {
     _animationCtrl.dispose();
+    if (widget.onDispose != null) {
+      widget.onDispose!();
+    }
     super.dispose();
   }
 }
@@ -304,6 +418,6 @@ class _ItemRemovalCallback {
   Future<void> Function()? run;
 }
 
-class ListItemRemoveExecutor {
-  void Function(Object itemKey, VoidCallback fn)? run;
+abstract class AdaptiveListItem {
+  Object get itemId;
 }

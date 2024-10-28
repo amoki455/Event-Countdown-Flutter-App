@@ -19,8 +19,6 @@ class EventsPage extends StatefulWidget {
 }
 
 class _EventsPageState extends State<EventsPage> {
-  final _itemRemoveExecutor = ListItemRemoveExecutor();
-
   @override
   void initState() {
     super.initState();
@@ -103,20 +101,26 @@ class _EventsPageState extends State<EventsPage> {
         top: 4,
         bottom: 80,
       ),
-      itemCount: controller.events.length,
-      itemKey: (index) => controller.events[index].id,
-      removeExecutor: _itemRemoveExecutor,
-      itemBuilder: (context, index) => EventCard(
-        title: controller.events[index].title,
-        description: controller.events[index].description ?? "",
-        dateTimeUTC: controller.events[index].getUtcDate() ?? DateTime.now(),
+      items: controller.events,
+      itemBuilder: (context, item) => EventCard(
+        title: item.title,
+        description: item.description ?? "",
+        dateTimeUTC: item.getUtcDate() ?? DateTime.now(),
         onEditClick: () async {
-          final result = await _openEventDetailsDialog(controller.events[index]);
-          if (result is Event) {
-            controller.events[index] = result;
+          final index = controller.events.indexOf(item);
+          if (index != -1) {
+            final result = await _openEventDetailsDialog(item);
+            if (result is Event) {
+              controller.events[index] = result;
+            }
           }
         },
-        onDeleteClick: () => _openDeleteConfirmationDialog(controller.events[index], index),
+        onDeleteClick: () {
+          final index = controller.events.indexOf(item);
+          if (index != -1) {
+            _openDeleteConfirmationDialog(controller.events[index], index);
+          }
+        },
       ),
     );
   }
@@ -213,9 +217,7 @@ class _EventsPageState extends State<EventsPage> {
             onPressed: () async {
               Navigator.of(context).pop();
               controller.deleteEvent(controller.events[index].id);
-              if (_itemRemoveExecutor.run != null) {
-                _itemRemoveExecutor.run!(event.id, () => controller.events.removeAt(index));
-              }
+              controller.events.removeAt(index);
             },
             child: const Text("Yes", style: TextStyle(color: Colors.red)),
           ),
