@@ -25,7 +25,7 @@ class NotificationsController extends GetxController {
   }
 
   Future<bool?> _init() async {
-    const initializationSettingsAndroid = AndroidInitializationSettings('ic_launcher');
+    const initializationSettingsAndroid = AndroidInitializationSettings('launcher_icon');
     final initializationSettingsDarwin = DarwinInitializationSettings(onDidReceiveLocalNotification: (id, title, body, payload) {});
     const initializationSettingsLinux = LinuxInitializationSettings(defaultActionName: 'Open');
     final initializationSettings = InitializationSettings(
