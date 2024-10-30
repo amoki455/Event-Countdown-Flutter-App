@@ -15,8 +15,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(url: Constants.supabaseUrl, anonKey: Constants.supabaseAnonKey);
   tz.initializeTimeZones();
-  Get.put(AuthenticationController(), permanent: true);
   Get.put(NotificationsController(), permanent: true);
+  Get.put(AuthenticationController(), permanent: true);
   Get.put(ShellController(), permanent: true);
   runApp(const MyApp());
 }
@@ -26,6 +26,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Get.find<AuthenticationController>().init();
+    });
     final colorScheme = ColorScheme.fromSeed(
       seedColor: Colors.blueAccent,
       brightness: Brightness.dark,

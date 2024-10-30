@@ -24,9 +24,6 @@ class AccountPage extends StatelessWidget {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Obx(() {
-              if (controller.currentUser.value != null) {
-                WidgetsBinding.instance.addPostFrameCallback((_) => Get.offNamed("/events"));
-              }
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [

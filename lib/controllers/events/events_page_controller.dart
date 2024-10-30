@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:event_countdown/controllers/notifications/notifications_controller.dart';
 import 'package:event_countdown/data/repository/events_repository.dart';
 import 'package:event_countdown/data/repository/supabase_events_repository.dart';
 import 'package:flutter/material.dart';
@@ -11,11 +12,14 @@ class EventsPageController extends GetxController {
   EventsPageController({
     EventsRepository? repository,
     ShellController? shellController,
+    NotificationsController? notificationsController,
   })  : _repository = repository ?? SupabaseEventsRepository(),
-        _shellController = shellController ?? Get.find();
+        _shellController = shellController ?? Get.find(),
+        _notificationsController = notificationsController ?? Get.find();
 
   final EventsRepository _repository;
   final ShellController _shellController;
+  final NotificationsController _notificationsController;
 
   final isLoading = false.obs;
   final events = <Event>[].obs;
@@ -26,6 +30,7 @@ class EventsPageController extends GetxController {
     try {
       isLoading.value = true;
       events.addAll(await _repository.getEvents());
+      _scheduleNotifications();
     } on Exception catch (e) {
       error.value = e;
     } finally {
@@ -36,6 +41,7 @@ class EventsPageController extends GetxController {
   Future<bool> deleteEvent(String id) async {
     try {
       await _repository.deleteEvent(id);
+      _notificationsController.cancelEventNotifications(id);
       return true;
     } on Exception catch (e) {
       String errorMsg = "";
@@ -55,6 +61,12 @@ class EventsPageController extends GetxController {
         icon: Icons.error,
       );
       return false;
+    }
+  }
+
+  void _scheduleNotifications() {
+    for (final event in events) {
+      _notificationsController.scheduleEventNotifications(event);
     }
   }
 }

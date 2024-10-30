@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/event.dart';
+import '../notifications/notifications_controller.dart';
 import '../shell_controller.dart';
 
 class EventDetailsPageController extends GetxController {
@@ -12,9 +13,11 @@ class EventDetailsPageController extends GetxController {
     Event? currentEvent,
     EventsRepository? eventsRepository,
     ShellController? shellController,
+    NotificationsController? notificationsController,
   })  : eventUID = currentEvent?.id.obs ?? ''.obs,
         _eventsRepository = eventsRepository ?? SupabaseEventsRepository(),
-        _shellController = shellController ?? Get.find() {
+        _shellController = shellController ?? Get.find(),
+        _notificationsController = notificationsController ?? Get.find() {
     if (currentEvent != null) {
       titleTextController.text = currentEvent.title;
       descriptionTextController.text = currentEvent.description ?? "";
@@ -25,6 +28,7 @@ class EventDetailsPageController extends GetxController {
 
   final EventsRepository _eventsRepository;
   final ShellController _shellController;
+  final NotificationsController _notificationsController;
   final RxString eventUID;
 
   final titleTextController = TextEditingController();
@@ -61,7 +65,11 @@ class EventDetailsPageController extends GetxController {
             .toString(),
         createdAtTimestampUTC: "",
       );
-      return await _eventsRepository.insertEvent(event);
+      final result = await _eventsRepository.insertEvent(event);
+      if (result != null) {
+        _notificationsController.scheduleEventNotifications(result);
+      }
+      return result;
     } on Exception catch (e) {
       handleException(e);
       return null;
@@ -98,7 +106,12 @@ class EventDetailsPageController extends GetxController {
             .toString(),
         createdAtTimestampUTC: "",
       );
-      return await _eventsRepository.updateEvent(event);
+      final result = await _eventsRepository.updateEvent(event);
+      if (result != null) {
+        _notificationsController.cancelEventNotifications(result.id);
+        _notificationsController.scheduleEventNotifications(result);
+      }
+      return result;
     } on Exception catch (e) {
       handleException(e);
       return null;

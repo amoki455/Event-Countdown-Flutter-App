@@ -54,7 +54,6 @@ class _EventsPageState extends State<EventsPage> {
                   child: const Text("Logout"),
                   onTap: () {
                     authController.signOut();
-                    Get.offNamed("/account");
                   },
                 ),
               ];
