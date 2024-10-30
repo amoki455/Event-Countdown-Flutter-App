@@ -196,8 +196,9 @@ class _AdaptiveListState extends State<AdaptiveList> {
         final callback = itemsRemoveCallbacks[itemId];
         if (callback != null && callback.run != null) {
           _recalculateIndices();
-          callback.run!().then((_) {
-            _itemsRemovalCallbacks.removeWhere((key, value) => value == callback);
+          callback.run!(runAfter: () {
+            _itemsIndices.remove(itemId);
+            _itemsRemovalCallbacks.remove(itemId);
           });
         }
       }
@@ -267,19 +268,14 @@ class _AnimatedItemState extends State<_AnimatedItem> with SingleTickerProviderS
   Animation<Offset>? _gridItemOffsetAnimation;
   bool _removed = false;
 
-  @override
-  void initState() {
-    super.initState();
-    if (widget.onInit != null) {
-      widget.onInit!();
-    }
+  void _initAnimationCtrl() {
     _animationCtrl = AnimationController(
       vsync: this,
       duration: kItemAnimationDuration,
     )
       ..addListener(_animationListener)
       ..addStatusListener(
-        (status) {
+            (status) {
           if (status == AnimationStatus.completed) {
             _gridItemOffsetAnimation = null;
           }
@@ -290,16 +286,17 @@ class _AnimatedItemState extends State<_AnimatedItem> with SingleTickerProviderS
       parent: _animationCtrl,
       curve: Curves.fastEaseInToSlowEaseOut,
     );
+  }
 
-    widget.itemRemovalCallback.run = () async {
-      if (mounted) {
-        _animationCtrl.reverse().whenCompleteOrCancel(() {
-          _removed = true;
-          widget.itemRemovalCallback.run = null;
-        });
-      }
-    };
+  @override
+  void initState() {
+    super.initState();
+    if (widget.onInit != null) {
+      widget.onInit!();
+    }
 
+    _initAnimationCtrl();
+    widget.itemRemovalCallback.run = _startRemoveAnimation;
     _checkItemReordering();
 
     if ((widget.isInGrid && _gridItemOffsetAnimation != null)) {
@@ -404,6 +401,18 @@ class _AnimatedItemState extends State<_AnimatedItem> with SingleTickerProviderS
     }
   }
 
+  void _startRemoveAnimation({void Function()? runAfter}) {
+    if (mounted) {
+      _animationCtrl.reverse().whenCompleteOrCancel(() {
+        _removed = true;
+        if (runAfter != null) {
+          runAfter();
+        }
+        widget.itemRemovalCallback.run = null;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _animationCtrl.dispose();
@@ -415,7 +424,7 @@ class _AnimatedItemState extends State<_AnimatedItem> with SingleTickerProviderS
 }
 
 class _ItemRemovalCallback {
-  Future<void> Function()? run;
+  void Function({void Function()? runAfter})? run;
 }
 
 abstract class AdaptiveListItem {
