@@ -62,6 +62,10 @@ The Event Countdown Flutter App is a user-friendly application that allows users
      flutter run --dart-define=SUPABASE_URL=<your-supabase-url> --dart-define=SUPABASE_ANON_KEY=<your-supabase-anon-key>
      ```
 
+## Responsive UI demonstration
+
+https://github.com/user-attachments/assets/f966437a-5b46-4e2e-8f93-7c50dfcfb273
+
 ## Screenshots
 
 <img src="https://github.com/user-attachments/assets/a7e4b88c-85aa-4798-9504-79dee59b09a3" width="200"/> <img src="https://github.com/user-attachments/assets/39e0b03b-cd24-4033-9338-9a7f1ef4a7f4" width="200"/> <img src="https://github.com/user-attachments/assets/62018f4f-619f-44d5-88bf-cd2b2590eac9" width="200"/> <img src="https://github.com/user-attachments/assets/17cfaf3c-4cad-4f61-9272-b0d7fa353b7d" width="200"/> <img src="https://github.com/user-attachments/assets/6a1cdb31-c68d-4e84-9913-4740e6bbf6f8" width="200"/> <img src="https://github.com/user-attachments/assets/2c87b9f3-8687-4cb0-80bb-49d8b4914aa8" width="200"/> <img src="https://github.com/user-attachments/assets/1d102908-eb10-418f-a0c1-6843923c6a38" width="200"/> 
